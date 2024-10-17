@@ -1,5 +1,4 @@
 import 'dart:developer';
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 
@@ -31,6 +30,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late DetectorHelper detectorHelper;
   bool _isProcessing = false;
   ui.Image? _displayImage;
+  List<int> inference = [0, 0, 0, 0];
 
   initCamera() {
     _controller = CameraController(widget.camera, ResolutionPreset.medium,
@@ -97,8 +97,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       (normalMask[2] * originImageHeight).floor(),
       (normalMask[3] * originImageHeight).floor(),
     ];
-    log("Mask: $mask");
-
+    setState(() {
+      inference = mask;
+    });
     List<int> imageMatrix = [];
     for (int i = 0; i < originImageWidth; i++) {
       for (int j = 0; j < originImageHeight; j++) {
@@ -164,14 +165,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       body: cameraWidget(context),
       floatingActionButton: FloatingActionButton(onPressed: () async {
         final image = await _controller.takePicture();
-        if (context.mounted) {
-          Navigator.of(context).push(MaterialPageRoute(builder: (context) {
-            return TookPic(
-              pic: image,
-              detectorHelper: detectorHelper,
-            );
-          }));
+        if (!context.mounted) {
+          return;
         }
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) {
+          return TookPic(
+            path: image.path,
+            detectorHelper: detectorHelper,
+            crop: inference,
+          );
+        }));
       }),
     );
   }
@@ -179,6 +182,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
 class OverlayPainter extends CustomPainter {
   late final ui.Image image;
+
   updateImage(ui.Image image) {
     this.image = image;
   }
