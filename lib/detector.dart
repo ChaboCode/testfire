@@ -41,7 +41,6 @@ class DetectorHelper {
     isolateInference.sendPort
         .send(inferenceModel..responsePort = responsePort.sendPort);
     var results = await responsePort.first;
-    log("Resulsts: $results");
     return results;
   }
 

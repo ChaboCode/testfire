@@ -21,53 +21,63 @@ class TookPic extends StatefulWidget {
 }
 
 class _TookPicState extends State<TookPic> {
-  late Future<RecognizedText> recognizedText;
-  late Uint8List cropped;
+  var _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+
+  String? text;
+  Uint8List? cropped;
 
   @override
-  void initState() {
-    super.initState();
-  // Crop image according to prediction
-    final image = img.decodeImage(File(widget.path).readAsBytesSync());
+  void dispose() {
+    _textRecognizer.close();
+    super.dispose();
+  }
+
+  void process() async {
+    final image = img.decodeImage(await File(widget.path).readAsBytes());
     int width = widget.crop[1] - widget.crop[0];
     int height = widget.crop[3] - widget.crop[2];
     img.Image crop = img.copyCrop(image!,
         x: widget.crop[0], y: widget.crop[2], width: width, height: height);
     final bytes = Uint8List.fromList(img.encodePng(crop));
+    final tempDir = Directory.systemTemp;
+    final tempFile = await File("${tempDir.path}/temp").writeAsBytes(bytes);
 
     // OCR
-    final inputImage = InputImage.fromBytes(
-        bytes: bytes,
-        metadata: InputImageMetadata(
-            size: Size(width.toDouble(), height.toDouble()),
-            rotation: InputImageRotation.rotation0deg,
-            bytesPerRow: 2,
-            format: InputImageFormat.bgra8888));
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    // final inputImage = InputImage.fromBytes(
+    //     bytes: bytes,
+    //     metadata: InputImageMetadata(
+    //         size: Size(width.toDouble(), height.toDouble()),
+    //         rotation: InputImageRotation.rotation0deg,
+    //         bytesPerRow: 2,
+    //         format: InputImageFormat.bgra8888));
+    final inputImage = InputImage.fromFilePath(tempFile.path);
+    final recognition = await _textRecognizer.processImage(inputImage);
+
     setState(() {
       cropped = bytes;
-      recognizedText = textRecognizer.processImage(inputImage);
+     text = recognition.text;
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-        return Scaffold(
-        body: Center(
-      child: Stack(
-        children: [
-          Image.memory(cropped),
-          FutureBuilder<RecognizedText>(
-              future: recognizedText,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                }
+  void initState() {
+    super.initState();
+    process();
+    // Crop image according to prediction
+  }
 
-                return Text("Recognition: ${snapshot.data != null ? snapshot.data!.text : "None"}");
-              })
-        ],
-      ),
-    ));
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          children: [
+            if(cropped != null) Image.memory(cropped!),
+                  Text(
+                      "Recognition: $text")
+          ],
+        )
+      )
+    );
   }
 }
